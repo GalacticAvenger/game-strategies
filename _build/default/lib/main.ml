@@ -196,7 +196,7 @@ module Exercises = struct
     | None ->
       if depth = 0
       then
-        2 * List.length (winning_moves game ~me)
+        (4 * List.length (winning_moves game ~me))
         - List.length (losing_moves game ~me)
       else if maximizing_player
       then (
@@ -230,6 +230,13 @@ module Exercises = struct
   let get_move (game : Game.t) ~me =
     if List.length (Map.keys game.board) < 1
     then { Game.Position.row = 1; column = 1 }
+    else if List.length (Map.keys game.board) = 1
+    then
+      if not
+           (List.exists (available_moves game) ~f:(fun a ->
+              Game.Position.equal a { Game.Position.row = 1; column = 1 }))
+      then { Game.Position.row = 1; column = 1 }
+      else { Game.Position.row = 2; column = 2 }
     else if not (List.is_empty (winning_moves game ~me))
     then List.hd_exn (winning_moves game ~me)
     else (
