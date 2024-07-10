@@ -196,7 +196,7 @@ module Exercises = struct
     | None ->
       if depth = 0
       then
-        List.length (winning_moves game ~me)
+        2 * List.length (winning_moves game ~me)
         - List.length (losing_moves game ~me)
       else if maximizing_player
       then (
@@ -242,7 +242,7 @@ module Exercises = struct
       let highest_score = ref Int.min_value in
       let move = ref (List.hd_exn moves_to_look) in
       List.iter moves_to_look ~f:(fun a ->
-        let minimax_call = minimax 7 true game ~me in
+        let minimax_call = minimax 9 true game ~me in
         if minimax_call > !highest_score then move := a;
         highest_score := minimax_call);
       !move)
