@@ -189,54 +189,63 @@ module Exercises = struct
   ;;
 
   let rec minimax depth maximizing_player (game : Game.t) ~me =
-    (* Need to implement heuristic  *)
-    match (check_for_win me game) with
-    | Some _player -> if maximizing_player then Int.max_value else Int.min_value
-    | None -> 
-    if depth = 0
-    then 
-      (List.length (winning_moves game ~me)) - (List.length (losing_moves game ~me))
-    else if maximizing_player
-    then (
-      let value = ref Int.min_value in
-      List.iter (available_moves game) ~f:(fun a ->
-        let board = Map.add_exn game.board ~key:a ~data:me in
-        value
-        := max
-             !value
-             (minimax
-                (depth - 1)
-                false
-                { Game.game_kind = game.game_kind; board }
-                ~me));
-      !value)
-    else (
-      let value = ref Int.max_value in
-      List.iter (available_moves game) ~f:(fun a ->
-        let board = Map.add_exn game.board ~key:a ~data:me in
-        value
-        := max
-             !value
-             (minimax
-                (depth - 1)
-                true
-                { Game.game_kind = game.game_kind; board }
-                ~me));
-      !value)
+    (* Need to implement heuristic *)
+    match check_for_win me game with
+    | Some _player ->
+      if maximizing_player then Int.max_value else Int.min_value
+    | None ->
+      if depth = 0
+      then
+        List.length (winning_moves game ~me)
+        - List.length (losing_moves game ~me)
+      else if maximizing_player
+      then (
+        let value = ref Int.min_value in
+        List.iter (available_moves game) ~f:(fun a ->
+          let board = Map.add_exn game.board ~key:a ~data:me in
+          value
+          := max
+               !value
+               (minimax
+                  (depth - 1)
+                  false
+                  { Game.game_kind = game.game_kind; board }
+                  ~me));
+        !value)
+      else (
+        let value = ref Int.max_value in
+        List.iter (available_moves game) ~f:(fun a ->
+          let board = Map.add_exn game.board ~key:a ~data:me in
+          value
+          := max
+               !value
+               (minimax
+                  (depth - 1)
+                  true
+                  { Game.game_kind = game.game_kind; board }
+                  ~me));
+        !value)
   ;;
 
   let get_move (game : Game.t) ~me =
-    if ((List.length (Map.keys game.board)) < 2) then ({Game.Position.row=1; column=1}) else
-      if (not (List.is_empty (winning_moves game ~me))) then (List.hd_exn (winning_moves game ~me)) else
-    let moves_to_look = if (List.is_empty (available_moves_that_do_not_immediately_lose ~me game)) then (available_moves game) else (available_moves_that_do_not_immediately_lose ~me game) in
-    let highest_score = ref Int.min_value in
-    let move = ref (List.hd_exn moves_to_look) in 
-    List.iter moves_to_look ~f:(fun a -> 
-      let minimax_call = (minimax 7 true game ~me) in
-      if minimax_call > !highest_score then 
-        move := a; 
-        highest_score := minimax_call; );
-    !move
+    if List.length (Map.keys game.board) < 1
+    then { Game.Position.row = 1; column = 1 }
+    else if not (List.is_empty (winning_moves game ~me))
+    then List.hd_exn (winning_moves game ~me)
+    else (
+      let moves_to_look =
+        if List.is_empty
+             (available_moves_that_do_not_immediately_lose ~me game)
+        then available_moves game
+        else available_moves_that_do_not_immediately_lose ~me game
+      in
+      let highest_score = ref Int.min_value in
+      let move = ref (List.hd_exn moves_to_look) in
+      List.iter moves_to_look ~f:(fun a ->
+        let minimax_call = minimax 7 true game ~me in
+        if minimax_call > !highest_score then move := a;
+        highest_score := minimax_call);
+      !move)
   ;;
 
   let exercise_one =
@@ -312,7 +321,9 @@ let handle (_client : unit) (query : Rpcs.Take_turn.Query.t) =
   print_s [%message "Received query"];
   Core.printf "Finished waiting\n%!";
   let response =
-    { Rpcs.Take_turn.Response.piece = query.you_play; position = (Exercises.get_move query.game ~me:query.you_play)}
+    { Rpcs.Take_turn.Response.piece = query.you_play
+    ; position = Exercises.get_move query.game ~me:query.you_play
+    }
   in
   return response
 ;;
