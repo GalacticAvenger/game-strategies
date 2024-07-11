@@ -80,8 +80,10 @@ module Exercises = struct
   let available_moves (game : Game.t) : Game.Position.t list =
     let moves =
       List.concat
-        (List.init 3 ~f:(fun y ->
-           List.init 3 ~f:(fun x -> { Game.Position.row = y; column = x })))
+        (List.init (Game.Game_kind.board_length game.game_kind) ~f:(fun y ->
+           List.init
+             (Game.Game_kind.board_length game.game_kind)
+             ~f:(fun x -> { Game.Position.row = y; column = x })))
     in
     List.filter moves ~f:(fun move ->
       not
@@ -98,20 +100,44 @@ module Exercises = struct
   ;;
 
   let check_for_win (player : Game.Piece.t) (game : Game.t) =
+    let _gomoku_iter_list = List.init 11 ~f:(fun a -> a) in
+    let add_list = List.tl_exn (List.init 6 ~f:(fun a -> a)) in
+    (* print_s [%message (gomoku_win_possibilities : Game.Position.t list
+       list)]; *)
     let iter_list = List.init 3 ~f:(fun a -> a) in
     let win_possibilities =
-      List.map iter_list ~f:(fun y ->
-        List.map iter_list ~f:(fun x ->
-          { Game.Position.row = y; column = x }))
-      @ List.map iter_list ~f:(fun x ->
+      match game.game_kind with
+      | Tic_tac_toe ->
         List.map iter_list ~f:(fun y ->
-          { Game.Position.row = y; column = x }))
-      @ [ List.map iter_list ~f:(fun a ->
-            { Game.Position.row = a; column = a })
-        ]
-      @ [ List.map iter_list ~f:(fun a ->
-            { Game.Position.row = a; column = 2 - a })
-        ]
+          List.map iter_list ~f:(fun x ->
+            { Game.Position.row = y; column = x }))
+        @ List.map iter_list ~f:(fun x ->
+          List.map iter_list ~f:(fun y ->
+            { Game.Position.row = y; column = x }))
+        @ [ List.map iter_list ~f:(fun a ->
+              { Game.Position.row = a; column = a })
+          ]
+        @ [ List.map iter_list ~f:(fun a ->
+              { Game.Position.row = a; column = 2 - a })
+          ]
+      | Omok ->
+        List.concat
+          (List.map _gomoku_iter_list ~f:(fun y ->
+             List.map _gomoku_iter_list ~f:(fun x ->
+               List.map add_list ~f:(fun add ->
+                 { Game.Position.row = y; column = x + add })))
+           @ List.map _gomoku_iter_list ~f:(fun y ->
+             List.map _gomoku_iter_list ~f:(fun x ->
+               List.map add_list ~f:(fun add ->
+                 { Game.Position.row = x + add; column = y })))
+           @ List.map _gomoku_iter_list ~f:(fun y ->
+             List.map _gomoku_iter_list ~f:(fun x ->
+               List.map add_list ~f:(fun add ->
+                 { Game.Position.row = x + add; column = y + add })))
+           @ List.map _gomoku_iter_list ~f:(fun y ->
+             List.map _gomoku_iter_list ~f:(fun x ->
+               List.map add_list ~f:(fun add ->
+                 { Game.Position.row = x + add; column = 15 - y + add }))))
     in
     let used_moves = player_moves player game in
     if List.exists win_possibilities ~f:(fun list ->
@@ -125,7 +151,8 @@ module Exercises = struct
   (* Exercise 2 *)
   let evaluate (game : Game.t) : Game.Evaluation.t =
     if List.exists (Map.keys game.board) ~f:(fun key ->
-         key.row > 3 && key.column > 3)
+         key.row > Game.Game_kind.board_length game.game_kind
+         && key.column > Game.Game_kind.board_length game.game_kind)
     then Illegal_move
     else (
       match check_for_win X game with
