@@ -194,64 +194,81 @@ module Exercises = struct
     | Some _player ->
       if maximizing_player then Int.max_value else Int.min_value
     | None ->
-      if depth = 0
+      if depth = 0 || List.length (available_moves game) = 0
       then
-        (4 * List.length (winning_moves game ~me))
+        List.length (winning_moves game ~me)
         - List.length (losing_moves game ~me)
       else if maximizing_player
       then (
         let value = ref Int.min_value in
         List.iter (available_moves game) ~f:(fun a ->
-          let board = Map.add_exn game.board ~key:a ~data:me in
+          let new_board = Map.add_exn game.board ~key:a ~data:me in
           value
           := max
                !value
                (minimax
                   (depth - 1)
                   false
-                  { Game.game_kind = game.game_kind; board }
+                  { Game.game_kind = game.game_kind; board = new_board }
                   ~me));
         !value)
       else (
         let value = ref Int.max_value in
         List.iter (available_moves game) ~f:(fun a ->
-          let board = Map.add_exn game.board ~key:a ~data:me in
+          let new_board =
+            Map.add_exn
+              game.board
+              ~key:a
+              ~data:(if Game.Piece.equal me X then O else X)
+          in
           value
-          := max
+          := min
                !value
                (minimax
                   (depth - 1)
                   true
-                  { Game.game_kind = game.game_kind; board }
+                  { Game.game_kind = game.game_kind; board = new_board }
                   ~me));
         !value)
   ;;
 
   let get_move (game : Game.t) ~me =
-    if List.length (Map.keys game.board) < 1
-    then { Game.Position.row = 1; column = 1 }
-    else if List.length (Map.keys game.board) = 1
-    then
-      if not
-           (List.exists (available_moves game) ~f:(fun a ->
-              Game.Position.equal a { Game.Position.row = 1; column = 1 }))
-      then { Game.Position.row = 1; column = 1 }
-      else { Game.Position.row = 2; column = 2 }
-    else if not (List.is_empty (winning_moves game ~me))
-    then List.hd_exn (winning_moves game ~me)
+    (* First or second move go middle *)
+    (* if List.length (Map.keys game.board) < 1 then { Game.Position.row = 1;
+       column = 1 } else if List.length (Map.keys game.board) = 1 then if
+       List.exists (available_moves game) ~f:(fun a -> Game.Position.equal a
+       { Game.Position.row = 1; column = 1 }) then { Game.Position.row = 1;
+       column = 1 } else { Game.Position.row = 2; column = 2 } (* Win game if
+       possible *) *)
+    if not (List.is_empty (winning_moves game ~me))
+    then List.hd_exn (winning_moves game ~me) (* No winning positions *)
     else (
+      (* Only look at moves where we wont lose unless loss is inevitable *)
       let moves_to_look =
         if List.is_empty
              (available_moves_that_do_not_immediately_lose ~me game)
         then available_moves game
         else available_moves_that_do_not_immediately_lose ~me game
       in
+      (* Establish default values for move and highest score *)
       let highest_score = ref Int.min_value in
       let move = ref (List.hd_exn moves_to_look) in
+      (* Iter over selected moves *)
       List.iter moves_to_look ~f:(fun a ->
-        let minimax_call = minimax 9 true game ~me in
-        if minimax_call > !highest_score then move := a;
-        highest_score := minimax_call);
+        let minimax_call =
+          minimax
+            2
+            false
+            { Game.game_kind = game.game_kind
+            ; board = Map.add_exn game.board ~key:a ~data:me
+            }
+            ~me
+        in
+        printf "%d\n" minimax_call;
+        if minimax_call > !highest_score
+        then (
+          move := a;
+          highest_score := minimax_call));
       !move)
   ;;
 
