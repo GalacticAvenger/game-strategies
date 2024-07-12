@@ -36,7 +36,9 @@ module Exercises = struct
   ;;
 
   let print_game (game : Game.t) =
-    let list1 = List.init 3 ~f:(fun a -> a) in
+    let list1 =
+      List.init (Game.Game_kind.board_length game.game_kind) ~f:(fun a -> a)
+    in
     List.iter list1 ~f:(fun y ->
       if y > 0 then printf "\n---------\n";
       List.iter list1 ~f:(fun x ->
@@ -47,7 +49,8 @@ module Exercises = struct
             if x = key.column && y = key.row
             then printf !"%{Game.Piece}" value)
         else printf " ";
-        if x < 2 then printf " | "))
+        if x < Game.Game_kind.board_length game.game_kind - 1
+        then printf " | "))
   ;;
 
   let%expect_test "print_win_for_x" =
@@ -76,21 +79,6 @@ module Exercises = struct
     return ()
   ;;
 
-  (* Exercise 1 *)
-  let available_moves (game : Game.t) : Game.Position.t list =
-    let moves =
-      List.concat
-        (List.init (Game.Game_kind.board_length game.game_kind) ~f:(fun y ->
-           List.init
-             (Game.Game_kind.board_length game.game_kind)
-             ~f:(fun x -> { Game.Position.row = y; column = x })))
-    in
-    List.filter moves ~f:(fun move ->
-      not
-        (List.exists (Map.keys game.board) ~f:(fun a ->
-           Game.Position.equal move a)))
-  ;;
-
   let player_moves (player : Game.Piece.t) (game : Game.t)
     : Game.Position.t list
     =
@@ -99,15 +87,157 @@ module Exercises = struct
          if Game.Piece.equal value player then true else false))
   ;;
 
+  let valid_move (move : Game.Position.t) (game : Game.t) =
+    if move.row >= Game.Game_kind.board_length game.game_kind
+       || move.column >= Game.Game_kind.board_length game.game_kind
+       || move.column < 0
+       || move.row < 0
+       || Map.mem game.board move
+    then false
+    else true
+  ;;
+
+  (* Exercise 1 *)
+  let available_moves (game : Game.t) : Game.Position.t list =
+    match game.game_kind with
+    | Omok ->
+      let moves = game.board in
+      let x =
+        Set.to_list
+          (Game.Position.Set.of_list
+             (List.concat_map (Map.keys moves) ~f:(fun a ->
+                let (surrounding : Game.Position.t list) =
+                  [ { Game.Position.row = a.row + 1; column = a.column }
+                  ; { Game.Position.row = a.row - 1; column = a.column }
+                  ; { Game.Position.row = a.row; column = a.column - 1 }
+                  ; { Game.Position.row = a.row; column = a.column + 1 }
+                  ; { Game.Position.row = a.row + 1; column = a.column + 1 }
+                  ; { Game.Position.row = a.row - 1; column = a.column - 1 }
+                  ; { Game.Position.row = a.row - 1; column = a.column + 1 }
+                  ; { Game.Position.row = a.row + 1; column = a.column - 1 }
+                  ]
+                in
+                List.filter_map surrounding ~f:(fun b ->
+                  if valid_move b game then Some b else None))))
+      in
+      (* print_s [%message (Map.keys moves : Game.Position.t list)];
+         print_s[%message (x : Game.Position.t list)];*)
+      x
+    | Tic_tac_toe ->
+      let moves =
+        List.concat
+          (List.init
+             (Game.Game_kind.board_length game.game_kind)
+             ~f:(fun y ->
+               List.init
+                 (Game.Game_kind.board_length game.game_kind)
+                 ~f:(fun x -> { Game.Position.row = y; column = x })))
+      in
+      List.filter moves ~f:(fun move ->
+        not
+          (List.exists (Map.keys game.board) ~f:(fun a ->
+             Game.Position.equal move a)))
+  ;;
+
   let check_for_win (player : Game.Piece.t) (game : Game.t) =
-    let _gomoku_iter_list = List.init 11 ~f:(fun a -> a) in
-    let add_list = List.tl_exn (List.init 6 ~f:(fun a -> a)) in
-    (* print_s [%message (gomoku_win_possibilities : Game.Position.t list
-       list)]; *)
-    let iter_list = List.init 3 ~f:(fun a -> a) in
-    let win_possibilities =
-      match game.game_kind with
-      | Tic_tac_toe ->
+    match game.game_kind with
+    | Omok ->
+      let player_moves = player_moves player game in
+      if List.exists player_moves ~f:(fun a ->
+           List.for_all
+             [ { Game.Position.row = a.row + 1; column = a.column }
+             ; { Game.Position.row = a.row + 2; column = a.column }
+             ; { Game.Position.row = a.row + 3; column = a.column }
+             ; { Game.Position.row = a.row + 4; column = a.column }
+             ]
+             ~f:(fun b ->
+               List.exists player_moves ~f:(fun c -> Game.Position.equal c b)))
+      then Some player
+      else if List.exists player_moves ~f:(fun a ->
+                List.for_all
+                  [ { Game.Position.row = a.row - 1; column = a.column }
+                  ; { Game.Position.row = a.row - 2; column = a.column }
+                  ; { Game.Position.row = a.row - 3; column = a.column }
+                  ; { Game.Position.row = a.row - 4; column = a.column }
+                  ]
+                  ~f:(fun b ->
+                    List.exists player_moves ~f:(fun c ->
+                      Game.Position.equal c b)))
+      then Some player
+      else if List.exists player_moves ~f:(fun a ->
+                List.for_all
+                  [ { Game.Position.row = a.row; column = a.column + 1 }
+                  ; { Game.Position.row = a.row; column = a.column + 2 }
+                  ; { Game.Position.row = a.row; column = a.column + 3 }
+                  ; { Game.Position.row = a.row; column = a.column + 4 }
+                  ]
+                  ~f:(fun b ->
+                    List.exists player_moves ~f:(fun c ->
+                      Game.Position.equal c b)))
+      then Some player
+      else if List.exists player_moves ~f:(fun a ->
+                List.for_all
+                  [ { Game.Position.row = a.row; column = a.column - 1 }
+                  ; { Game.Position.row = a.row; column = a.column - 2 }
+                  ; { Game.Position.row = a.row; column = a.column - 3 }
+                  ; { Game.Position.row = a.row; column = a.column - 4 }
+                  ]
+                  ~f:(fun b ->
+                    List.exists player_moves ~f:(fun c ->
+                      Game.Position.equal c b)))
+      then Some player
+      else if List.exists player_moves ~f:(fun a ->
+                List.for_all
+                  [ { Game.Position.row = a.row + 1; column = a.column - 1 }
+                  ; { Game.Position.row = a.row + 2; column = a.column - 2 }
+                  ; { Game.Position.row = a.row + 3; column = a.column - 3 }
+                  ; { Game.Position.row = a.row + 4; column = a.column - 4 }
+                  ]
+                  ~f:(fun b ->
+                    List.exists player_moves ~f:(fun c ->
+                      Game.Position.equal c b)))
+      then Some player
+      else if List.exists player_moves ~f:(fun a ->
+                List.for_all
+                  [ { Game.Position.row = a.row - 1; column = a.column - 1 }
+                  ; { Game.Position.row = a.row - 2; column = a.column - 2 }
+                  ; { Game.Position.row = a.row - 3; column = a.column - 3 }
+                  ; { Game.Position.row = a.row - 4; column = a.column - 4 }
+                  ]
+                  ~f:(fun b ->
+                    List.exists player_moves ~f:(fun c ->
+                      Game.Position.equal c b)))
+      then Some player
+      else if List.exists player_moves ~f:(fun a ->
+                List.for_all
+                  [ { Game.Position.row = a.row - 1; column = a.column + 1 }
+                  ; { Game.Position.row = a.row - 2; column = a.column + 2 }
+                  ; { Game.Position.row = a.row - 3; column = a.column + 3 }
+                  ; { Game.Position.row = a.row - 4; column = a.column + 4 }
+                  ]
+                  ~f:(fun b ->
+                    List.exists player_moves ~f:(fun c ->
+                      Game.Position.equal c b)))
+      then Some player
+      else if List.exists player_moves ~f:(fun a ->
+                List.for_all
+                  [ { Game.Position.row = a.row + 1; column = a.column + 1 }
+                  ; { Game.Position.row = a.row + 2; column = a.column + 2 }
+                  ; { Game.Position.row = a.row + 3; column = a.column + 3 }
+                  ; { Game.Position.row = a.row + 4; column = a.column + 4 }
+                  ]
+                  ~f:(fun b ->
+                    List.exists player_moves ~f:(fun c ->
+                      Game.Position.equal c b)))
+      then Some player
+      else None
+    | Tic_tac_toe ->
+      (* let _gomoku_iter_list = List.init 11 ~f:(fun a -> a) in let add_list
+         = List.tl_exn (List.init 6 ~f:(fun a -> a)) in *)
+      (* print_s [%message (gomoku_win_possibilities : Game.Position.t list
+         list)]; *)
+      let iter_list = List.init 3 ~f:(fun a -> a) in
+      let win_possibilities =
         List.map iter_list ~f:(fun y ->
           List.map iter_list ~f:(fun x ->
             { Game.Position.row = y; column = x }))
@@ -120,32 +250,27 @@ module Exercises = struct
         @ [ List.map iter_list ~f:(fun a ->
               { Game.Position.row = a; column = 2 - a })
           ]
-      | Omok ->
-        List.concat
-          (List.map _gomoku_iter_list ~f:(fun y ->
-             List.map _gomoku_iter_list ~f:(fun x ->
-               List.map add_list ~f:(fun add ->
-                 { Game.Position.row = y; column = x + add })))
-           @ List.map _gomoku_iter_list ~f:(fun y ->
-             List.map _gomoku_iter_list ~f:(fun x ->
-               List.map add_list ~f:(fun add ->
-                 { Game.Position.row = x + add; column = y })))
-           @ List.map _gomoku_iter_list ~f:(fun y ->
-             List.map _gomoku_iter_list ~f:(fun x ->
-               List.map add_list ~f:(fun add ->
-                 { Game.Position.row = x + add; column = y + add })))
-           @ List.map _gomoku_iter_list ~f:(fun y ->
-             List.map _gomoku_iter_list ~f:(fun x ->
-               List.map add_list ~f:(fun add ->
-                 { Game.Position.row = x + add; column = 15 - y + add }))))
-    in
-    let used_moves = player_moves player game in
-    if List.exists win_possibilities ~f:(fun list ->
-         List.for_all list ~f:(fun move ->
-           List.exists used_moves ~f:(fun my_move ->
-             Game.Position.equal my_move move)))
-    then Some player
-    else None
+        (* List.concat (List.map _gomoku_iter_list ~f:(fun y -> List.map
+           _gomoku_iter_list ~f:(fun x -> List.map add_list ~f:(fun add -> {
+           Game.Position.row = y; column = x + add }))) @ List.map
+           _gomoku_iter_list ~f:(fun y -> List.map _gomoku_iter_list ~f:(fun
+           x -> List.map add_list ~f:(fun add -> { Game.Position.row = x +
+           add; column = y }))) @ List.map _gomoku_iter_list ~f:(fun y ->
+           List.map _gomoku_iter_list ~f:(fun x -> List.map add_list ~f:(fun
+           add -> { Game.Position.row = x + add; column = y + add }))) @
+           List.map _gomoku_iter_list ~f:(fun y -> List.map _gomoku_iter_list
+           ~f:(fun x -> List.map add_list ~f:(fun add -> { Game.Position.row
+           = x + add; column = 15 - y + add })))) *)
+      in
+      (* print_s [%message (win_possibilities : Game.Position.t list
+         list)]; *)
+      let used_moves = player_moves player game in
+      if List.exists win_possibilities ~f:(fun list ->
+           List.for_all list ~f:(fun move ->
+             List.exists used_moves ~f:(fun my_move ->
+               Game.Position.equal my_move move)))
+      then Some player
+      else None
   ;;
 
   (* Exercise 2 *)
@@ -171,6 +296,7 @@ module Exercises = struct
   let winning_moves ~(me : Game.Piece.t) (game : Game.t)
     : Game.Position.t list
     =
+    (* ignore me; ignore game; [] *)
     List.filter (available_moves game) ~f:(fun a ->
       let board = Map.add_exn game.board ~key:a ~data:me in
       match check_for_win me { Game.game_kind = game.game_kind; board } with
@@ -187,33 +313,38 @@ module Exercises = struct
   let losing_moves ~(me : Game.Piece.t) (game : Game.t)
     : Game.Position.t list
     =
-    if Game.Piece.equal me X
-    then
-      if not (List.is_empty (winning_moves ~me:O game))
-      then
-        List.filter (available_moves game) ~f:(fun a ->
-          not
-            (List.exists (winning_moves ~me:O game) ~f:(fun b ->
-               Game.Position.equal a b)))
-      else []
-    else if not (List.is_empty (winning_moves ~me:X game))
-    then
-      List.filter (available_moves game) ~f:(fun a ->
-        not
-          (List.exists (winning_moves ~me:X game) ~f:(fun b ->
-             Game.Position.equal a b)))
-    else []
+    (* if Game.Piece.equal me X then if not (List.is_empty (winning_moves
+       ~me:O game)) then List.filter (available_moves game) ~f:(fun a -> not
+       (List.exists (winning_moves ~me:O game) ~f:(fun b ->
+       Game.Position.equal a b))) else [] else if not (List.is_empty
+       (winning_moves ~me:X game)) then List.filter (available_moves game)
+       ~f:(fun a -> not (List.exists (winning_moves ~me:X game) ~f:(fun b ->
+       Game.Position.equal a b))) else [] *)
+    let win_moves_set =
+      Game.Position.Set.of_list (winning_moves ~me:(Game.Piece.flip me) game)
+    in
+    let avail_moves_set = Game.Position.Set.of_list (available_moves game) in
+    Set.to_list (Set.inter win_moves_set avail_moves_set)
   ;;
+
+  (* if not (List.is_empty (winning_moves ~me:(Game.Piece.flip me) game))
+     then List.filter (available_moves game) ~f:(fun a -> List.exists
+     (winning_moves ~me:(Game.Piece.flip me) game) ~f:(fun b ->
+     Game.Position.equal a b)) else [] *)
 
   let available_moves_that_do_not_immediately_lose
     ~(me : Game.Piece.t)
     (game : Game.t)
     =
-    List.filter (available_moves game) ~f:(fun a ->
-      not
-        (List.exists (losing_moves ~me game) ~f:(fun b ->
-           Game.Position.equal a b)))
+    let los_moves_set =
+      Game.Position.Set.of_list (losing_moves ~me:(Game.Piece.flip me) game)
+    in
+    let avail_moves_set = Game.Position.Set.of_list (available_moves game) in
+    Set.to_list (Set.inter los_moves_set avail_moves_set)
   ;;
+
+  (* List.filter (available_moves game) ~f:(fun a -> not (List.exists
+     (losing_moves ~me game) ~f:(fun b -> Game.Position.equal a b))) *)
 
   let rec minimax depth maximizing_player (game : Game.t) ~me =
     (* Need to implement heuristic *)
@@ -221,42 +352,51 @@ module Exercises = struct
     | Some _player ->
       if maximizing_player then Int.max_value else Int.min_value
     | None ->
-      if depth = 0 || List.length (available_moves game) = 0
-      then
-        List.length (winning_moves game ~me)
-        - List.length (losing_moves game ~me)
-      else if maximizing_player
-      then (
-        let value = ref Int.min_value in
-        List.iter (available_moves game) ~f:(fun a ->
-          let new_board = Map.add_exn game.board ~key:a ~data:me in
-          value
-          := max
-               !value
-               (minimax
-                  (depth - 1)
-                  false
-                  { Game.game_kind = game.game_kind; board = new_board }
-                  ~me));
-        !value)
-      else (
-        let value = ref Int.max_value in
-        List.iter (available_moves game) ~f:(fun a ->
-          let new_board =
-            Map.add_exn
-              game.board
-              ~key:a
-              ~data:(if Game.Piece.equal me X then O else X)
-          in
-          value
-          := min
-               !value
-               (minimax
-                  (depth - 1)
-                  true
-                  { Game.game_kind = game.game_kind; board = new_board }
-                  ~me));
-        !value)
+      (match check_for_win (Game.Piece.flip me) game with
+       | Some _player ->
+         if maximizing_player then Int.max_value else Int.min_value
+       | None ->
+         if depth = 0 || List.length (available_moves game) = 0
+         then (
+           match game.game_kind with
+           | Tic_tac_toe ->
+             List.length (winning_moves game ~me)
+             - List.length (losing_moves game ~me)
+           | Omok ->
+             (4 * List.length (winning_moves game ~me))
+             - 2 * List.length (losing_moves game ~me))
+         else if maximizing_player
+         then (
+           let value = ref Int.min_value in
+           List.iter (available_moves game) ~f:(fun a ->
+             let new_board = Map.add_exn game.board ~key:a ~data:me in
+             value
+             := max
+                  !value
+                  (minimax
+                     (depth - 1)
+                     false
+                     { Game.game_kind = game.game_kind; board = new_board }
+                     ~me));
+           !value)
+         else (
+           let value = ref Int.max_value in
+           List.iter (available_moves game) ~f:(fun a ->
+             let new_board =
+               Map.add_exn
+                 game.board
+                 ~key:a
+                 ~data:(if Game.Piece.equal me X then O else X)
+             in
+             value
+             := min
+                  !value
+                  (minimax
+                     (depth - 1)
+                     true
+                     { Game.game_kind = game.game_kind; board = new_board }
+                     ~me));
+           !value))
   ;;
 
   let get_move (game : Game.t) ~me =
@@ -272,8 +412,10 @@ module Exercises = struct
     else (
       (* Only look at moves where we wont lose unless loss is inevitable *)
       let moves_to_look =
-        if List.is_empty
-             (available_moves_that_do_not_immediately_lose ~me game)
+        if List.is_empty (available_moves game)
+        then [ { Game.Position.row = 7; column = 7 } ]
+        else if List.is_empty
+                  (available_moves_that_do_not_immediately_lose ~me game)
         then available_moves game
         else available_moves_that_do_not_immediately_lose ~me game
       in
@@ -284,7 +426,7 @@ module Exercises = struct
       List.iter moves_to_look ~f:(fun a ->
         let minimax_call =
           minimax
-            2
+            (match game.game_kind with Tic_tac_toe -> 2 | Omok -> 1)
             false
             { Game.game_kind = game.game_kind
             ; board = Map.add_exn game.board ~key:a ~data:me
@@ -295,7 +437,14 @@ module Exercises = struct
         if minimax_call > !highest_score
         then (
           move := a;
-          highest_score := minimax_call));
+          highest_score := minimax_call)
+        else if minimax_call = !highest_score
+        then (
+          let x = Random.int 2 in
+          if 1 = x
+          then (
+            move := a;
+            highest_score := minimax_call)));
       !move)
   ;;
 
